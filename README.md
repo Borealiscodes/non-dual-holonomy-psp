@@ -68,4 +68,4 @@ python3 -B tests/verify_fixed_point.py
 * **Preprints:**
   * Hedling, B. S. (2026). *Beyond bolted-on screen readers: Narrative phenomenology, the RNIB Roundhouse sensory dark, and perceptual-cognitive unity (Rasa-Darśan)*. Zenodo. https://doi.org/10.5281/zenodo.24393275 
   * Hedling, B. S. (2026). *From robotic screen-reader telemetry to embodied neural cadence: A narrative & empirical chronicle of guardrails, CLI flag literalism, and dual-voice VITS synthesis under edge constraints*. Zenodo. https://doi.org/10.5281/zenodo.24399123
-* **Companion Repositories:** [`ndh-retro-hw-pipeline`](https://github.com/Borealiscodes/ndh-retro-hw-pipeline) · [`edge-sovereign-audit`](https://github.com)
+* **Companion Repositories:** [`ndh-retro-hw-pipeline`](https://github.com/Borealiscodes/ndh-retro-hw-pipeline) · [`edge-sovereign-audit`](https://github.com/Borealiscodes/edge-sovereign-audit)
