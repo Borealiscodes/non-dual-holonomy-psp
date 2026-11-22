@@ -1,6 +1,6 @@
 # ✨ `non-dual-holonomy-psp` — Deterministic Fixed-Point Living Canvas (`Q16.16` · `CLUT8` · `sceSas`)
 
-> **🎨 Status: Active Creative & Sensory Sanctuary (`Zero-Float` · `Zero-Dependency` · `< 250 KB`)**  
+> **🎨 Status: Complete & Live Creative Sanctuary (`Zero-Float` · `Zero-Dependency` · `< 250 KB`)**  
 > Built to run anywhere—from a constrained `ARM64` Android tablet browser to desktop—with zero external dependencies, zero floating-point drift, and zero server overhead.
 
 ---
@@ -19,39 +19,47 @@
 
 ---
 
-## Repository Scaffolding
+## Repository Structure
 
 ```text
 non-dual-holonomy-psp/
-├── README.md                          # Project philosophy, controls, mathematical invariants & Zenodo links
-├── LICENSE                            # Open-source license (MIT / AGPL-3.0)
-├── .gitignore                         # Ignores OS/editor caches
+├── README.md                                  # Master overview, controls, architecture & Zenodo DOIs
+├── .gitignore                                 # Ignores Python/OS/editor caches
 │
-├── index.html                         # Primary entry point: Expanded PSP GU + SAS Tactile Canvas
+├── index.html                                 # Primary entry point: Live Q16.16 PSP GU + SAS Tactile Canvas
 │
 ├── prototypes/
-│   ├── psp-gu-baseline.html           # Minimal 480x272 Q16.16 Bezier + CLUT8 visual baseline
-│   └── psp-gu-sas-expanded.html       # Full tactile spring sculpting, 4x4 Bayer dither & Karplus-Strong DSP
+│   ├── psp-gu-baseline.html                   # Minimal 480x272 Q16.16 Bezier + CLUT8 visual baseline
+│   └── psp-gu-sas-expanded.html               # Expanded tactile spring sculpting, Bayer dither & Karplus-Strong DSP
 │
-└── docs/
-    └── FIXED_POINT_SPEC.md            # Mathematical notes: Q16.16 Bhaskara LUT, De Casteljau & LFSR audio
+├── docs/
+│   ├── FIXED_POINT_SPEC.md                    # Formal math spec: Q16.16 Bhaskara LUT, De Casteljau & LFSR audio
+│   ├── PREPRINT_NON_DUAL_HOLONOMY.md          # Narrative preprint: Mario 64 vs. Bezier silk & PSP vs. PS Vita study
+│   └── BILL_NYE_PSP_TILE_EXPLAINER.md         # Accessible science explainer tile for students & makers
+│
+└── tests/
+    └── verify_fixed_point.py                  # Zero-dependency Python unittest verifying Q16.16 & LFSR invariants
 ```
 
 ---
 
 ## Quick Start (`Zero Build` · `Offline Ready`)
-No `npm`, `node_modules`, bundlers, or local servers are needed:
+No `npm`, `node_modules`, bundlers, or external servers are required:
 
-1. Open `index.html` (or `prototypes/psp-gu-sas-expanded.html`) directly in any mobile or desktop web browser.
-2. **Touch or drag** across the `480×272` viewport to inject damped spring impulses into the `4×4` Bezier control grid.
-3. Toggle **SAS Synth: ON** to hear pentatonic Karplus-Strong strings resonate as your fingers sculpt the surface.
+1. **Direct Browser Launch:** Open `index.html` (or `prototypes/psp-gu-baseline.html`) directly in any mobile or desktop browser.
+2. **Localhost Serve (`Termux` / Desktop — Unlocks Web Audio Cleanly):**
+   ```bash
+   python3 -B -m http.server 8080 --bind 127.0.0.1
+   ```
+   Then open **`http://127.0.0`** in your browser.
+3. **Interact:**
+   * **Touch or drag** across the `480×272` viewport to inject damped integer spring impulses into the `4×4` Bezier control grid.
+   * Switch between **Aurora**, **Kyoto**, and **Abyss** `CLUT` themes or toggle **Cycle** and **Rim** borders.
+   * Tap **SAS Synth: ON** to hear 8 pentatonic Karplus-Strong waveguide strings resonate as you sculpt the manifold.
 
-### One-Command Termux Bootstrap (`< 50 KB` Footprint)
+### Run Deterministic Math Verification (`0 MB` Dependencies)
 ```bash
-mkdir -p ~/non-dual-holonomy-psp/{prototypes,docs} && \
-touch ~/non-dual-holonomy-psp/{README.md,LICENSE,.gitignore,index.html} \
-      ~/non-dual-holonomy-psp/prototypes/{psp-gu-baseline.html,psp-gu-sas-expanded.html} \
-      ~/non-dual-holonomy-psp/docs/FIXED_POINT_SPEC.md
+python3 -B tests/verify_fixed_point.py
 ```
 
 ---
