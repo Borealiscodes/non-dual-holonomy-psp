@@ -1,343 +1,149 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no" />
-  <title>Non Dual Holonomy — PSP GU + SAS Fixed-Point Engine</title>
-  <style>
-    :root { --bg:#07090e; --panel:#10141f; --border:#262f45; --text:#e2e8f0; --muted:#94a3b8; --accent:#a78bfa; }
-    * { box-sizing: border-box; }
-    body { margin:0; min-height:100vh; background:var(--bg); color:var(--text); font-family:ui-monospace,SFMono-Regular,Menlo,Monaco,Consolas,monospace; display:flex; flex-direction:column; align-items:center; justify-content:center; padding:14px; gap:10px; }
-    header { text-align:center; max-width:740px; }
-    h1 { font-size:1rem; margin:0 0 4px; letter-spacing:0.05em; color:var(--accent); }
-    p { margin:0; font-size:0.76rem; color:var(--muted); }
-    .psp-bezel { border:2px solid var(--border); border-radius:14px; padding:12px 16px; background:linear-gradient(180deg,#151a27 0%,#0a0d14 100%); box-shadow:0 16px 40px rgba(0,0,0,0.75); display:flex; flex-direction:column; align-items:center; gap:8px; }
-    canvas#pspScreen { display:block; width:720px; max-width:92vw; height:auto; aspect-ratio:480/272; image-rendering:pixelated; image-rendering:crisp-edges; border:1px solid #2e374d; background:#05070c; touch-action:none; cursor:crosshair; }
-    .clut-strip { width:100%; height:10px; image-rendering:pixelated; border:1px solid #2e374d; }
-    .controls { display:flex; flex-wrap:wrap; gap:7px; justify-content:center; max-width:740px; background:var(--panel); border:1px solid var(--border); border-radius:6px; padding:9px 12px; }
-    button, select { background:#1a2030; color:var(--text); border:1px solid #35405c; border-radius:4px; padding:6px 9px; font-family:inherit; font-size:0.75rem; cursor:pointer; }
-    button:hover, select:hover { border-color:var(--accent); }
-    button.active { background:#2b1f4d; border-color:var(--accent); color:#ddd6fe; }
-    .hud { font-size:0.7rem; color:var(--muted); text-align:center; }
-  </style>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,user-scalable=no">
+<title>Non Dual Holonomy PSP</title>
+<style>
+body{margin:0;min-height:100vh;background:#07090e;color:#e2e8f0;font-family:monospace;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:12px;gap:10px}
+canvas{display:block;width:720px;max-width:94vw;aspect-ratio:480/272;image-rendering:pixelated;border:2px solid #2e374d;background:#0b1020;touch-action:none}
+#clut{height:12px}
+.row{display:flex;flex-wrap:wrap;gap:8px;justify-content:center}
+button,select{background:#1a2030;color:#e2e8f0;border:1px solid #3b4766;border-radius:4px;padding:7px 10px;font-family:inherit;font-size:13px}
+button.on{background:#2e1d59;border-color:#a78bfa}
+#hud{font-size:12px;color:#a78bfa;text-align:center}
+</style>
 </head>
 <body>
-  <header>
-    <h1>NON DUAL HOLONOMY — PSP GU + SAS EXPANSION (480×272 · Q16.16 ZERO-FLOAT)</h1>
-    <p>Touch/Drag Canvas to Sculpt Bicubic Bezier Manifold & Pluck Integer Karplus-Strong Voices</p>
-  </header>
-  <div class="psp-bezel">
-    <canvas id="pspScreen" width="480" height="272"></canvas>
-    <canvas id="clutVis" class="clut-strip" width="256" height="1" title="Live 256-Entry CLUT"></canvas>
-  </div>
-  <div class="controls">
-    <select id="selPalette" title="CLUT Theme">
-      <option value="aurora">CLUT: Borealis Aurora</option>
-      <option value="sakura">CLUT: Kyoto Lantern</option>
-      <option value="abyss">CLUT: Bioluminescent Abyss</option>
-    </select>
-    <select id="selTess" title="Bezier Tessellation Grid">
-      <option value="12">Tess: 12×12 (288 Tris)</option>
-      <option value="16" selected>Tess: 16×16 (512 Tris)</option>
-      <option value="20">Tess: 20×20 (800 Tris)</option>
-    </select>
-    <button id="btnCycle" class="active">CLUT Cycle: ON</button>
-    <button id="btnDither" class="active">4×4 Ordered Dither: ON</button>
-    <button id="btnWire" class="active">GU Rim: ON</button>
-    <button id="btnAudio">SAS Synth: OFF</button>
-  </div>
-  <div class="hud" id="hud">Frame: 0 | EDRAM: 130.5 KB + 1 KB CLUT | Touch/Drag to Sculpt</div>
-  <script>
-    const SHIFT = 16, ONE = 1 << SHIFT;
-    const mulQ16 = (a, b) => Number((BigInt(a) * BigInt(b)) >> 16n) | 0;
-    const ceilDiv = (a, b) => a >= 0 ? ((a + b - 1) / b) | 0 : (a / b) | 0;
-
-    const SIN_LUT = new Int32Array(1024);
-    (() => {
-      for (let i = 0; i <= 256; i++) {
-        const x = BigInt(i * 9000) / 256n;
-        const term = x * (18000n - x);
-        const val = Number((4n * term * 65536n) / (405000000n - term)) | 0;
-        SIN_LUT[i] = val; SIN_LUT[512 - i] = val;
-        SIN_LUT[512 + i] = -val; SIN_LUT[(1024 - i) & 1023] = -val;
+<div id="hud">Starting...</div>
+<canvas id="scr" width="480" height="272"></canvas>
+<canvas id="clut" width="256" height="1"></canvas>
+<div class="row">
+  <select id="pal"><option value="0">Aurora</option><option value="1">Kyoto</option><option value="2">Abyss</option></select>
+  <button id="bCyc" class="on">Cycle: ON</button>
+  <button id="bRim" class="on">Rim: ON</button>
+  <button id="bSnd">SAS Synth: OFF</button>
+</div>
+<script>
+const W=480,H=272,ONE=65536;
+const mul=(a,b)=>Number((BigInt(a)*BigInt(b))>>16n)|0;
+const SIN=new Int32Array(1024);
+for(let i=0;i<=256;i++){
+  const x=BigInt(i*9000)/256n,t=x*(18000n-x);
+  const v=Number((4n*t*65536n)/(405000000n-t))|0;
+  SIN[i]=SIN[512-i]=v; SIN[512+i]=SIN[(1024-i)&1023]=-v;
+}
+const sinQ=a=>SIN[a&1023], cosQ=a=>SIN[(a+256)&1023];
+const idxB=new Uint8Array(W*H), zB=new Int32Array(W*H);
+const bPal=new Uint32Array(256), aPal=new Uint32Array(256);
+const abgr=(r,g,b)=>((255<<24)|((b&255)<<16)|((g&255)<<8)|(r&255))>>>0;
+function theme(m){
+  for(let i=0;i<32;i++){const k=i<<3;bPal[i]=m==1?abgr(16+(k>>3),8,24+(k>>3)):m==2?abgr(4,14+(k>>3),30+(k>>2)):abgr(10+(k>>4),12+(k>>4),28+(k>>2));}
+  for(let i=0;i<208;i++){
+    const ph=((i*1024)/208)|0,w1=(sinQ(ph)+ONE)>>9,w2=(cosQ(ph*2)+ONE)>>9;
+    bPal[32+i]=m==1?abgr(80+((w1*170)>>8),30+((w2*140)>>8),60+((w1*90)>>8)):m==2?abgr(15+((w2*65)>>8),70+((w1*180)>>8),115+((w2*135)>>8)):abgr(40+((w2*160)>>8),80+((w1*170)>>8),140+((w1*110)>>8));
+  }
+  for(let i=0;i<16;i++)bPal[240+i]=abgr(165+i*5,165+i*5,255);
+  aPal.set(bPal);
+}
+function bez1(p0,p1,p2,p3,t){
+  const it=ONE-t,a0=mul(p0,it)+mul(p1,t),a1=mul(p1,it)+mul(p2,t),a2=mul(p2,it)+mul(p3,t);
+  return mul(mul(a0,it)+mul(a1,t),it)+mul(mul(a1,it)+mul(a2,t),t);
+}
+const cx=new Int32Array(4),cy=new Int32Array(4),cz=new Int32Array(4);
+function patch(g,u,v){
+  for(let r=0;r<4;r++){const b=r*4;cx[r]=bez1(g[b].x,g[b+1].x,g[b+2].x,g[b+3].x,u);cy[r]=bez1(g[b].y,g[b+1].y,g[b+2].y,g[b+3].y,u);cz[r]=bez1(g[b].z,g[b+1].z,g[b+2].z,g[b+3].z,u);}
+  return{x:bez1(cx[0],cx[1],cx[2],cx[3],v),y:bez1(cy[0],cy[1],cy[2],cy[3],v),z:bez1(cz[0],cz[1],cz[2],cz[3],v)};
+}
+function tri(v0,v1,v2,rim){
+  if(v1.y<v0.y){let t=v0;v0=v1;v1=t;} if(v2.y<v0.y){let t=v0;v0=v2;v2=t;} if(v2.y<v1.y){let t=v1;v1=v2;v2=t;}
+  const th=v2.y-v0.y; if(th<=0)return;
+  const dxl=(((v2.x-v0.x)<<16)/th)|0,dzl=((v2.z-v0.z)/th)|0,dcl=(((v2.c-v0.c)<<16)/th)|0;
+  let xl=v0.x<<16,zl=v0.z,cl=v0.c<<16;
+  for(let h=0;h<2;h++){
+    const sv=h?v1:v0,ev=h?v2:v1,sh=ev.y-sv.y; if(sh<=0)continue;
+    const dxs=(((ev.x-sv.x)<<16)/sh)|0,dzs=((ev.z-sv.z)/sh)|0,dcs=(((ev.c-sv.c)<<16)/sh)|0;
+    let xs=sv.x<<16,zs=sv.z,cs=sv.c<<16;
+    for(let y=sv.y;y<ev.y;y++){
+      if(y>=0&&y<H){
+        let a=xl,b=xs,za=zl,zb=zs,ca=cl,cb=cs;
+        if(a>b){let t=a;a=b;b=t;t=za;za=zb;zb=t;t=ca;ca=cb;cb=t;}
+        const x0=Math.max(0,a>>16),x1=Math.min(W,b>>16),sp=x1-x0;
+        if(sp>0){
+          const dz=((zb-za)/sp)|0,dc=((cb-ca)/sp)|0; let z=za,c=ca,row=y*W;
+          for(let x=x0;x<x1;x++){
+            const idx=row+x;
+            if(z<zB[idx]){zB[idx]=z;idxB[idx]=(rim&&(x===x0||x===x1-1||y===sv.y))?248:Math.max(32,Math.min(239,c>>16));}
+            z+=dz;c+=dc;
+          }
+        }
       }
-    })();
-    const sinQ16 = (a) => SIN_LUT[a & 1023];
-    const cosQ16 = (a) => SIN_LUT[(a + 256) & 1023];
-
-    function buildRotationMatrixQ16(rx, ry, rz) {
-      const sx = sinQ16(rx), cx = cosQ16(rx);
-      const sy = sinQ16(ry), cy = cosQ16(ry);
-      const sz = sinQ16(rz), cz = cosQ16(rz);
-      const sxsy = mulQ16(sx, sy), cxsy = mulQ16(cx, sy);
-      return new Int32Array([
-        mulQ16(cy, cz) + mulQ16(sxsy, sz), mulQ16(-cy, sz) + mulQ16(sxsy, cz), mulQ16(sy, cx),
-        mulQ16(cx, sz), mulQ16(cx, cz), -sx,
-        mulQ16(-sy, cz) + mulQ16(cxsy, sz), mulQ16(sy, sz) + mulQ16(cxsy, cz), mulQ16(cx, cy)
-      ]);
+      xl+=dxl;zl+=dzl;cl+=dcl;xs+=dxs;zs+=dzs;cs+=dcs;
     }
-
-    const W = 480, H = 272;
-    const indexBuf = new Uint8Array(W * H);
-    const zBuf = new Int32Array(W * H);
-    const baseCLUT = new Uint32Array(256);
-    const activeCLUT = new Uint32Array(256);
-    const BAYER_4X4 = new Int32Array().map(v => ((v - 8) << 12));
-
-    function packABGR(r, g, b) {
-      const cr = r < 0 ? 0 : r > 255 ? 255 : r;
-      const cg = g < 0 ? 0 : g > 255 ? 255 : g;
-      const cb = b < 0 ? 0 : b > 255 ? 255 : b;
-      return (255 << 24) | (cb << 16) | (cg << 8) | cr;
-    }
-
-    function buildCLUTTheme(theme) {
-      for (let i = 0; i < 32; i++) {
-        const t = i << 3;
-        if (theme === "sakura") baseCLUT[i] = packABGR(14 + (t >> 3), 8 + (t >> 5), 22 + (t >> 3));
-        else if (theme === "abyss") baseCLUT[i] = packABGR(4 + (t >> 5), 12 + (t >> 3), 26 + (t >> 2));
-        else baseCLUT[i] = packABGR(8 + (t >> 4), 10 + (t >> 4), 24 + (t >> 2));
-      }
-      for (let i = 0; i < 208; i++) {
-        const phase = ((i * 1024) / 208) | 0;
-        const w1 = (sinQ16(phase) + ONE) >> 9, w2 = (cosQ16(phase * 2) + ONE) >> 9;
-        if (theme === "sakura") baseCLUT[32 + i] = packABGR(70 + ((w1 * 180) >> 8), 24 + ((w2 * 150) >> 8), 55 + ((w1 * 95) >> 8));
-        else if (theme === "abyss") baseCLUT[32 + i] = packABGR(12 + ((w2 * 70) >> 8), 65 + ((w1 * 185) >> 8), 110 + ((w2 * 140) >> 8));
-        else baseCLUT[32 + i] = packABGR(35 + ((w2 * 165) >> 8), 75 + ((w1 * 175) >> 8), 135 + ((w1 * 115) >> 8));
-      }
-      for (let i = 0; i < 16; i++) {
-        const glow = 160 + (i * 6);
-        baseCLUT[240 + i] = packABGR(glow, glow, Math.min(255, glow + 20));
-      }
-      activeCLUT.set(baseCLUT);
-    }
-
-    function updateCLUTCycle(shiftOffset) {
-      const span = 208, offset = ((shiftOffset % span) + span) % span;
-      for (let i = 0; i < 32; i++) activeCLUT[i] = baseCLUT[i];
-      for (let i = 0; i < span; i++) activeCLUT[32 + i] = baseCLUT[32 + ((i + offset) % span)];
-      for (let i = 240; i < 256; i++) activeCLUT[i] = baseCLUT[i];
-    }
-
-    function evalCubicBezierQ16(p0, p1, p2, p3, tQ16) {
-      const invT = ONE - tQ16;
-      const a0 = mulQ16(p0, invT) + mulQ16(p1, tQ16);
-      const a1 = mulQ16(p1, invT) + mulQ16(p2, tQ16);
-      const a2 = mulQ16(p2, invT) + mulQ16(p3, tQ16);
-      const b0 = mulQ16(a0, invT) + mulQ16(a1, tQ16);
-      const b1 = mulQ16(a1, invT) + mulQ16(a2, tQ16);
-      return mulQ16(b0, invT) + mulQ16(b1, tQ16);
-    }
-
-    function evalBicubicPatchQ16(ctrlGrid, uQ16, vQ16) {
-      const colX = new Int32Array(4), colY = new Int32Array(4), colZ = new Int32Array(4);
-      for (let row = 0; row < 4; row++) {
-        const base = row * 4;
-        const p0 = ctrlGrid[base], p1 = ctrlGrid[base + 1], p2 = ctrlGrid[base + 2], p3 = ctrlGrid[base + 3];
-        colX[row] = evalCubicBezierQ16(p0.x, p1.x, p2.x, p3.x, uQ16);
-        colY[row] = evalCubicBezierQ16(p0.y, p1.y, p2.y, p3.y, uQ16);
-        colZ[row] = evalCubicBezierQ16(p0.z, p1.z, p2.z, p3.z, uQ16);
-      }
-      return {
-        x: evalCubicBezierQ16(colX, colX, colX, colX, vQ16),
-        y: evalCubicBezierQ16(colY, colY, colY, colY, vQ16),
-        z: evalCubicBezierQ16(colZ, colZ, colZ, colZ, vQ16)
-      };
-    }
-
-    const touchOffsetY = new Int32Array(16), touchVelY = new Int32Array(16);
-    function stepTactileSprings() {
-      for (let i = 0; i < 16; i++) {
-        const force = -(touchOffsetY[i] >> 5) - (touchVelY[i] >> 3);
-        touchVelY[i] += force;
-        touchOffsetY[i] += touchVelY[i];
-      }
-    }
-
-    function drawIndexedZTriangle(v0, v1, v2, rimHighlight, ditherOn) {
-      if (v1.y < v0.y) { const t = v0; v0 = v1; v1 = t; }
-      if (v2.y < v0.y) { const t = v0; v0 = v2; v2 = t; }
-      if (v2.y < v1.y) { const t = v1; v1 = v2; v2 = t; }
-      const totalH = v2.y - v0.y;
-      if (totalH <= 0) return;
-
-      const dxLong = (((v2.x - v0.x) << SHIFT) / totalH) | 0;
-      const dzLong = ((v2.z - v0.z) / totalH) | 0;
-      const dcLong = (((v2.c - v0.c) << SHIFT) / totalH) | 0;
-      let xLong = v0.x << SHIFT, zLong = v0.z, cLong = v0.c << SHIFT;
-
-      for (let half = 0; half < 2; half++) {
-        const startV = half === 0 ? v0 : v1, endV = half === 0 ? v1 : v2;
-        const segH = endV.y - startV.y;
-        if (segH <= 0) continue;
-        const dxShort = (((endV.x - startV.x) << SHIFT) / segH) | 0;
-        const dzShort = ((endV.z - startV.z) / segH) | 0;
-        const dcShort = (((endV.c - startV.c) << SHIFT) / segH) | 0;
-        let xShort = startV.x << SHIFT, zShort = startV.z, cShort = startV.c << SHIFT;
-
-        for (let y = startV.y; y < endV.y; y++) {
-          if (y >= 0 && y < H) {
-            let xl = xLong, xr = xShort, zl = zLong, zr = zShort, cl = cLong, cr = cShort;
-            if (xl > xr) { let t = xl; xl = xr; xr = t; t = zl; zl = zr; zr = t; t = cl; cl = cr; cr = t; }
-            const xStart = Math.max(0, ceilDiv(xl, ONE)), xEnd = Math.min(W, ceilDiv(xr, ONE));
-            const span = (xr - xl) >> SHIFT;
-            if (xEnd > xStart && span > 0) {
-              const dz = ((zr - zl) / span) | 0, dc = ((cr - cl) / span) | 0;
-              const preStep = BigInt((xStart << SHIFT) - xl);
-              let z = zl + Number((BigInt(dz) * preStep) >> 16n);
-              let c = cl + Number((BigInt(dc) * preStep) >> 16n);
-              const rowOff = y * W, bayerRow = (y & 3) << 2;
-              for (let x = xStart; x < xEnd; x++) {
-
-const idx = rowOff + x;
-if (z < zBuf[idx]) {
-zBuf[idx] = z;
-if (rimHighlight && (x === xStart || x === xEnd - 1 || y === startV.y)) {
-indexBuf[idx] = 248;
-} else {
-const ditherBias = ditherOn ? BAYER_4X4[bayerRow + (x & 3)] : 0;
-const palIdx = (c + ditherBias) >> SHIFT;
-indexBuf[idx] = palIdx < 32 ? 32 : palIdx > 239 ? 239 : palIdx;
+  }
 }
+let actx=null,anode=null,sndOn=false,lfsr=0xACE1;
+const voices=[100,89,75,67,56,50,44,37].map(n=>({b:new Int16Array(n),p:0}));
+function pluck(vi){
+  const v=voices[vi&7];
+  for(let i=0;i<v.b.length;i++){const bit=((lfsr>>0)^(lfsr>>2)^(lfsr>>3)^(lfsr>>5))&1;lfsr=(lfsr>>1)|(bit<<15);v.b[i]=((lfsr&0x3FFF)-0x2000)>>1;}
 }
-z += dz; c += dc;
-}
-}
-}
-xLong += dxLong; zLong += dzLong; cLong += dcLong;
-xShort += dxShort; zShort += dzShort; cShort += dcShort;
-}
-}
-}
-let audioCtx = null, audioNode = null, audioActive = false;
-const VOICE_PERIODS =;
-const voices = VOICE_PERIODS.map(len => ({ buf: new Int16Array(len), ptr: 0 }));
-let lfsr = 0xACE1;
-function nextNoise16() {
-const bit = ((lfsr >> 0) ^ (lfsr >> 2) ^ (lfsr >> 3) ^ (lfsr >> 5)) & 1;
-lfsr = (lfsr >> 1) | (bit << 15);
-return (lfsr & 0x3FFF) - 0x2000;
-}
-function pluckVoice(voiceIdx, velocityQ8) {
-const v = voices[voiceIdx % voices.length];
-for (let i = 0; i < v.buf.length; i++) v.buf[i] = (nextNoise16() * velocityQ8) >> 8;
-}
-function toggleAudio() {
-if (!audioCtx) {
-audioCtx = new (window.AudioContext || window.webkitAudioContext)({ sampleRate: 22050 });
-audioNode = audioCtx.createScriptProcessor(512, 0, 1);
-audioNode.onaudioprocess = (e) => {
-const out = e.outputBuffer.getChannelData(0);
-if (!audioActive) { out.fill(0); return; }
-for (let s = 0; s < out.length; s++) {
-let mix = 0;
-for (let vi = 0; vi < voices.length; vi++) {
-const v = voices[vi], len = v.buf.length;
-const curr = v.buf[v.ptr], next = v.buf[(v.ptr + 1) % len];
-const avg = ((curr + next) * 253) >> 9;
-v.buf[v.ptr] = avg; v.ptr = (v.ptr + 1) % len; mix += curr;
-}
-out[s] = Math.max(-1, Math.min(1, mix / 32768));
-}
+const scr=document.getElementById("scr"),ctx=scr.getContext("2d"),img=ctx.createImageData(W,H),out32=new Uint32Array(img.data.buffer);
+const ccan=document.getElementById("clut"),cctx=ccan.getContext("2d"),cimg=cctx.createImageData(256,1),cout32=new Uint32Array(cimg.data.buffer);
+const hud=document.getElementById("hud");
+let cycOn=true,rimOn=true,tick=0,down=false;
+const offY=new Int32Array(16),velY=new Int32Array(16),grid=Array.from({length:16},()=>({x:0,y:0,z:0}));
+theme(0);
+document.getElementById("pal").onchange=e=>theme(+e.target.value);
+document.getElementById("bCyc").onclick=function(){cycOn=!cycOn;this.textContent=cycOn?"Cycle: ON":"Cycle: OFF";this.classList.toggle("on",cycOn);};
+document.getElementById("bRim").onclick=function(){rimOn=!rimOn;this.textContent=rimOn?"Rim: ON":"Rim: OFF";this.classList.toggle("on",rimOn);};
+document.getElementById("bSnd").onclick=function(){
+  if(!actx){
+    const AC=window.AudioContext||window.webkitAudioContext;actx=new AC({sampleRate:22050});
+    anode=actx.createScriptProcessor(512,0,1);
+    anode.onaudioprocess=e=>{const o=e.outputBuffer.getChannelData(0);if(!sndOn){o.fill(0);return;}
+      for(let s=0;s<o.length;s++){let sum=0;for(let vi=0;vi<8;vi++){const v=voices[vi],L=v.b.length,c0=v.b[v.p],c1=v.b[(v.p+1)%L];v.b[v.p]=((c0+c1)*253)>>9;v.p=(v.p+1)%L;sum+=c0;}o[s]=Math.max(-1,Math.min(1,sum/32768));}};
+    anode.connect(actx.destination);
+  }
+  if(actx.state==="suspended")actx.resume();
+  sndOn=!sndOn;this.textContent=sndOn?"SAS Synth: ON":"SAS Synth: OFF";this.classList.toggle("on",sndOn);if(sndOn)pluck(0);
 };
-audioNode.connect(audioCtx.destination);
+function touch(cx0,cy0){
+  const r=scr.getBoundingClientRect(),nx=Math.max(0,Math.min(0.99,(cx0-r.left)/r.width)),ny=Math.max(0,Math.min(0.99,(cy0-r.top)/r.height));
+  const idx=((ny*4)|0)*4+((nx*4)|0);velY[idx]+=(((0.5-ny)*ONE)>>2);if(sndOn&&(tick&3)===0)pluck(idx);
 }
-if (audioCtx.state === "suspended") audioCtx.resume();
-audioActive = !audioActive;
-const btn = document.getElementById("btnAudio");
-btn.textContent = audioActive ? "SAS Synth: ON" : "SAS Synth: OFF";
-btn.classList.toggle("active", audioActive);
-if (audioActive) pluckVoice(0, 220);
+scr.onpointerdown=e=>{down=true;touch(e.clientX,e.clientY);};
+scr.onpointermove=e=>{if(down)touch(e.clientX,e.clientY);};
+window.onpointerup=()=>{down=false;};
+function loop(){
+  for(let i=0;i<16;i++){const f=-(offY[i]>>5)-(velY[i]>>3);velY[i]+=f;offY[i]+=velY[i];}
+  zB.fill(0x7FFFFFFF);for(let y=0;y<H;y++)idxB.fill((y*31/H)|0,y*W,(y+1)*W);
+  for(let r=0;r<4;r++)for(let c=0;c<4;c++){
+    const i=r*4+c,wp=(tick*7+r*190+c*230)&1023,rp=(tick*5-r*140+c*170)&1023;
+    grid[i].x=(((c-1.5)*1.15*ONE)|0)+(sinQ(rp)>>3);
+    grid[i].y=(sinQ(wp)>>1)+(cosQ(rp)>>2)+offY[i];
+    grid[i].z=(((r-1.5)*1.15*ONE)|0)+(cosQ(wp)>>3);
+  }
+  const ry=(tick*2)&1023,sy=sinQ(ry),cy0=cosQ(ry),sx=sinQ(220),cx0=cosQ(220),N=14,st=N+1,verts=[];
+  for(let iv=0;iv<=N;iv++){const vq=((iv<<16)/N)|0;for(let iu=0;iu<=N;iu++){
+    const uq=((iu<<16)/N)|0,pt=patch(grid,uq,vq);
+    const x1=mul(cy0,pt.x)+mul(sy,pt.z),z1=mul(-sy,pt.x)+mul(cy0,pt.z);
+    const y2=mul(cx0,pt.y)-mul(sx,z1),z2=mul(sx,pt.y)+mul(cx0,z1)+((4.4*ONE)|0);
+    if(z2<=ONE){verts.push(null);continue;}
+    const sxp=Number((BigInt(x1)*BigInt(300<<16))/BigInt(z2))>>16,syp=Number((BigInt(y2)*BigInt(300<<16))/BigInt(z2))>>16;
+    verts.push({x:(sxp+240)|0,y:(syp+136)|0,z:z2,c:32+(((((iu+iv)*208/(N*2))|0)+(pt.y>>10))%208+208)%208});
+  }}
+  for(let iv=0;iv<N;iv++)for(let iu=0;iu<N;iu++){
+    const a=verts[iv*st+iu],b=verts[iv*st+iu+1],d=verts[(iv+1)*st+iu],e=verts[(iv+1)*st+iu+1];
+    if(a&&b&&d&&e){tri(a,b,e,rimOn);tri(a,e,d,rimOn);}
+  }
+  if(cycOn){const off=(tick>>1)%208;for(let k=0;k<208;k++)aPal[32+k]=bPal[32+((k+off)%208)];}
+  for(let px=0;px<W*H;px++)out32[px]=aPal[idxB[px]];
+  ctx.putImageData(img,0,0);cout32.set(aPal);cctx.putImageData(cimg,0,0);
+  if((tick&7)===0)hud.textContent="LIVE | Frame: "+tick+" | Q16.16 Bezier + CLUT8 | Touch to Sculpt";
+  tick++;requestAnimationFrame(loop);
 }
-const screenCanvas = document.getElementById("pspScreen");
-const screenCtx = screenCanvas.getContext("2d", { alpha: false });
-const imgData = screenCtx.createImageData(W, H);
-const out32 = new Uint32Array(imgData.data.buffer);
-const clutCanvas = document.getElementById("clutVis");
-const clutCtx = clutCanvas.getContext("2d");
-const clutImg = clutCtx.createImageData(256, 1);
-const clut32 = new Uint32Array(clutImg.data.buffer);
-const hudEl = document.getElementById("hud");
-let tessSteps = 16, cycleEnabled = true, ditherEnabled = true, rimEnabled = true;
-let frameTick = 0, isPointerDown = false, lastPluckTick = -10;
-buildCLUTTheme("aurora");
-document.getElementById("selPalette").addEventListener("change", (e) => buildCLUTTheme(e.target.value));
-document.getElementById("selTess").addEventListener("change", (e) => { tessSteps = parseInt(e.target.value, 10); });
-const btnCycle = document.getElementById("btnCycle");
-btnCycle.addEventListener("click", () => { cycleEnabled = !cycleEnabled; btnCycle.textContent = cycleEnabled ? "CLUT Cycle: ON" : "CLUT Cycle: OFF"; btnCycle.classList.toggle("active", cycleEnabled); });
-const btnDither = document.getElementById("btnDither");
-btnDither.addEventListener("click", () => { ditherEnabled = !ditherEnabled; btnDither.textContent = ditherEnabled ? "4×4 Ordered Dither: ON" : "4×4 Ordered Dither: OFF"; btnDither.classList.toggle("active", ditherEnabled); });
-const btnWire = document.getElementById("btnWire");
-btnWire.addEventListener("click", () => { rimEnabled = !rimEnabled; btnWire.textContent = rimEnabled ? "GU Rim: ON" : "GU Rim: OFF"; btnWire.classList.toggle("active", rimEnabled); });
-document.getElementById("btnAudio").addEventListener("click", toggleAudio);
-function applyTouchImpulse(clientX, clientY) {
-const rect = screenCanvas.getBoundingClientRect();
-const nx = Math.max(0, Math.min(0.999, (clientX - rect.left) / rect.width));
-const ny = Math.max(0, Math.min(0.999, (clientY - rect.top) / rect.height));
-const idx = ((ny * 4) | 0) * 4 + ((nx * 4) | 0);
-touchVelY[idx] += ((0.5 - ny) * ONE) >> 2;
-if (audioActive && frameTick - lastPluckTick >= 6) { pluckVoice(idx, 190); lastPluckTick = frameTick; }
-}
-screenCanvas.addEventListener("pointerdown", (e) => { isPointerDown = true; applyTouchImpulse(e.clientX, e.clientY); });
-screenCanvas.addEventListener("pointermove", (e) => { if (isPointerDown) applyTouchImpulse(e.clientX, e.clientY); });
-window.addEventListener("pointerup", () => { isPointerDown = false; });
-const ctrlGrid = Array.from({ length: 16 }, () => ({ x: 0, y: 0, z: 0 }));
-function renderFrame() {
-stepTactileSprings();
-zBuf.fill(0x7FFFFFFF);
-for (let y = 0; y < H; y++) indexBuf.fill((y * 31 / H) | 0, y * W, (y + 1) * W);
-for (let r = 0; r < 4; r++) {
-for (let c = 0; c < 4; c++) {
-const i = r * 4 + c;
-const baseX = ((c - 1.5) * 1.15 * ONE) | 0, baseZ = ((r - 1.5) * 1.15 * ONE) | 0;
-const wavePhase = (frameTick * 7 + r * 190 + c * 230) & 1023;
-const ripplePhase = (frameTick * 5 - r * 140 + c * 170) & 1023;
-const ampShift = ((r === 1 || r === 2) && (c === 1 || c === 2)) ? 0 : 1;
-ctrlGrid[i].x = baseX + (sinQ16(ripplePhase) >> 3);
-ctrlGrid[i].y = (sinQ16(wavePhase) >> (1 + ampShift)) + (cosQ16(ripplePhase) >> 2) + touchOffsetY[i];
-ctrlGrid[i].z = baseZ + (cosQ16(wavePhase) >> 3);
-}
-}
-const rx = 210 + (sinQ16((frameTick * 2) & 1023) >> 11), ry = (frameTick * 2) & 1023;
-const mat = buildRotationMatrixQ16(rx, ry, 0);
-const camPos = { x: 0, y: 0, z: (4.4 * ONE) | 0 };
-const focalQ16 = 310 << 16, halfW = W >> 1, halfH = H >> 1;
-const stride = tessSteps + 1, gridVerts = new Array(stride * stride);
-for (let iv = 0; iv <= tessSteps; iv++) {
-const vQ16 = ((iv << SHIFT) / tessSteps) | 0;
-for (let iu = 0; iu <= tessSteps; iu++) {
-const uQ16 = ((iu << SHIFT) / tessSteps) | 0;
-const pt = evalBicubicPatchQ16(ctrlGrid, uQ16, vQ16);
-const tx = mulQ16(mat, pt.x) + mulQ16(mat, pt.y) + mulQ16(mat, pt.z) + camPos.x;
-const ty = mulQ16(mat, pt.x) + mulQ16(mat, pt.y) + mulQ16(mat, pt.z) + camPos.y;
-const tz = mulQ16(mat, pt.x) + mulQ16(mat, pt.y) + mulQ16(mat, pt.z) + camPos.z;
-if (tz <= ONE) { gridVerts[iv * stride + iu] = null; continue; }
-const sx = Number((BigInt(tx) * BigInt(focalQ16)) / BigInt(tz)) >> SHIFT;
-const sy = Number((BigInt(ty) * BigInt(focalQ16)) / BigInt(tz)) >> SHIFT;
-const palIndex = 32 + (((((iu + iv) * 208 / (tessSteps * 2)) | 0) + (pt.y >> 10)) % 208 + 208) % 208;
-gridVerts[iv * stride + iu] = { x: (sx + halfW) | 0, y: (sy + halfH) | 0, z: tz, c: palIndex };
-}
-}
-for (let iv = 0; iv < tessSteps; iv++) {
-for (let iu = 0; iu < tessSteps; iu++) {
-const p00 = gridVerts[iv * stride + iu], p10 = gridVerts[iv * stride + (iu + 1)];
-const p01 = gridVerts[(iv + 1) * stride + iu], p11 = gridVerts[(iv + 1) * stride + (iu + 1)];
-if (!p00 || !p10 || !p01 || !p11) continue;
-drawIndexedZTriangle(p00, p10, p11, rimEnabled, ditherEnabled);
-drawIndexedZTriangle(p00, p11, p01, rimEnabled, ditherEnabled);
-}
-}
-if (cycleEnabled) updateCLUTCycle(frameTick >> 1);
-for (let i = 0; i < W * H; i++) out32[i] = activeCLUT[indexBuf[i]];
-screenCtx.putImageData(imgData, 0, 0);
-clut32.set(activeCLUT); clutCtx.putImageData(clutImg, 0, 0);
-if ((frameTick & 15) === 0) {
-hudEl.textContent = Frame: ${frameTick} | 480×272 | Grid: ${tessSteps}×${tessSteps} (${tessSteps*tessSteps*2} tris) | Dither: ${ditherEnabled ? "4×4" : "OFF"} | SAS: ${audioActive ? "ON" : "OFF"};
-}
-frameTick++;
-requestAnimationFrame(renderFrame);
-}
-requestAnimationFrame(renderFrame);
-
-
-
+requestAnimationFrame(loop);
+</script>
+</body>
+</html>
